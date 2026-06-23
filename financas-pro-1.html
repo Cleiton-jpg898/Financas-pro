@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <meta name="theme-color" content="#0D1B2A"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="FinançasPro"/>
+  <meta name="description" content="Controle de finanças pessoais"/>
+  <title>FinançasPro</title>
+
+  <!-- PWA Manifest inline via JS -->
+  <script>
+    const manifest = {
+      name: "FinançasPro",
+      short_name: "Finanças",
+      description: "Controle de finanças pessoais",
+      start_url: ".",
+      display: "standalone",
+      background_color: "#0D1B2A",
+      theme_color: "#0D1B2A",
+      orientation: "portrait",
+      icons: [
+        { src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='40' fill='%2300C896'/%3E%3Ctext x='96' y='130' font-size='100' text-anchor='middle' fill='%230D1B2A'%3E₿%3C/text%3E%3C/svg%3E", sizes: "192x192", type: "image/svg+xml" },
+        { src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='80' fill='%2300C896'/%3E%3Ctext x='256' y='360' font-size='280' text-anchor='middle' fill='%230D1B2A'%3E₿%3C/text%3E%3C/svg%3E", sizes: "512x512", type: "image/svg+xml" }
+      ]
+    };
+    const blob = new Blob([JSON.stringify(manifest)], {type:"application/json"});
+    const link = document.createElement("link");
+    link.rel = "manifest"; link.href = URL.createObjectURL(blob);
+    document.head.appendChild(link);
+  </script>
+
+  <!-- Service Worker para funcionamento offline -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      const sw = `
+        const CACHE = 'financas-v1';
+        self.addEventListener('install', e => {
+          e.waitUntil(caches.open(CACHE).then(c => c.addAll(['.'])));
+          self.skipWaiting();
+        });
+        self.addEventListener('activate', e => {
+          e.waitUntil(clients.claim());
+        });
+        self.addEventListener('fetch', e => {
+          e.respondWith(
+            caches.match(e.request).then(r => r || fetch(e.request).catch(() => caches.match('.')))
+          );
+        });
+      `;
+      const blob = new Blob([sw], {type:'text/javascript'});
+      navigator.serviceWorker.register(URL.createObjectURL(blob));
+    }
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+
+  <style>
+    :root {
+      --navy:       #0D1B2A;
+      --navy-mid:   #152338;
+      --navy-light: #1E3250;
+      --emerald:    #00C896;
+      --emerald-dim:#00C89620;
+      --coral:      #FF6B6B;
+      --coral-dim:  #FF6B6B20;
+      --gold:       #F5C542;
+      --gold-dim:   #F5C54220;
+      --sky:        #4FB3F6;
+      --sky-dim:    #4FB3F620;
+      --purple:     #A78BFA;
+      --pink:       #F472B6;
+      --white:      #F0F4F8;
+      --muted:      #7B8EA8;
+      --border:     #1E3250;
+      --safe-top:   env(safe-area-inset-top, 0px);
+      --safe-bot:   env(safe-area-inset-bottom, 0px);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      background: var(--navy);
+      color: var(--white);
+      font-family: 'Space Grotesk', sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Layout ── */
+    #app {
+      display: flex; flex-direction: column;
+      height: 100%; height: -webkit-fill-available;
+      padding-top: var(--safe-top);
+    }
+
+    /* ── Top bar ── */
+    .topbar {
+      background: var(--navy-mid);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 20px 12px;
+      display: flex; align-items: center; justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .topbar-logo { display: flex; align-items: center; gap: 10px; }
+    .topbar-icon {
+      width: 32px; height: 32px; background: var(--emerald);
+      border-radius: 9px; display: flex; align-items: center;
+      justify-content: center; font-size: 17px; color: var(--navy); font-weight: 700;
+    }
+    .topbar-title { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; }
+    .topbar-sub { font-size: 10px; color: var(--muted); }
+    .topbar-month { font-size: 12px; color: var(--muted); font-weight: 500; }
+
+    /* ── Content scroll area ── */
+    .content {
+      flex: 1; overflow-y: auto; overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+      padding: 18px 16px 12px;
+    }
+
+    /* ── Bottom nav ── */
+    .bottom-nav {
+      background: var(--navy-mid);
+      border-top: 1px solid var(--border);
+      display: flex;
+      padding-bottom: var(--safe-bot);
+      flex-shrink: 0;
+    }
+    .nav-btn {
+      flex: 1; display: flex; flex-direction: column; align-items: center;
+      padding: 10px 4px 8px; gap: 4px; cursor: pointer;
+      color: var(--muted); font-size: 10px; font-weight: 600;
+      letter-spacing: 0.3px; transition: color 0.15s; border: none;
+      background: none; font-family: inherit;
+    }
+    .nav-btn .icon { font-size: 22px; line-height: 1; }
+    .nav-btn.active { color: var(--emerald); }
+    .nav-btn.active .icon { filter: drop-shadow(0 0 6px #00C89688); }
+
+    /* ── Stat cards ── */
+    .stats-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+    .stat-card {
+      background: var(--navy-mid); border: 1px solid var(--border);
+      border-radius: 14px; padding: 16px;
+    }
+    .stat-card.wide { grid-column: 1/-1; }
+    .stat-label { font-size: 10px; color: var(--muted); font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px; }
+    .stat-value { font-family: 'JetBrains Mono', monospace; font-size: 22px;
+      font-weight: 700; letter-spacing: -0.5px; }
+    .stat-value.emerald { color: var(--emerald); }
+    .stat-value.coral   { color: var(--coral); }
+    .stat-value.gold    { color: var(--gold); }
+    .stat-value.sky     { color: var(--sky); }
+    .stat-delta { font-size: 11px; margin-top: 4px; }
+    .stat-delta.pos { color: var(--emerald); }
+    .stat-delta.neg { color: var(--coral); }
+
+    /* ── Panel ── */
+    .panel {
+      background: var(--navy-mid); border: 1px solid var(--border);
+      border-radius: 14px; overflow: hidden; margin-bottom: 16px;
+    }
+    .panel-hd {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 16px; border-bottom: 1px solid var(--border);
+    }
+    .panel-title { font-size: 13px; font-weight: 600; }
+
+    /* ── Transaction item ── */
+    .tx-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 16px; border-bottom: 1px solid var(--border);
+      active-state: background var(--navy-light);
+    }
+    .tx-item:last-child { border-bottom: none; }
+    .tx-icon {
+      width: 40px; height: 40px; border-radius: 11px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; flex-shrink: 0;
+    }
+    .tx-info { flex: 1; min-width: 0; }
+    .tx-name { font-size: 14px; font-weight: 500;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tx-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .tx-amount { font-family: 'JetBrains Mono', monospace; font-size: 14px;
+      font-weight: 700; flex-shrink: 0; }
+    .tx-amount.pos { color: var(--emerald); }
+    .tx-amount.neg { color: var(--coral); }
+    .tx-del {
+      width: 28px; height: 28px; border-radius: 8px;
+      background: var(--coral-dim); color: var(--coral); border: none;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; cursor: pointer; flex-shrink: 0; font-family: inherit;
+    }
+
+    /* ── Pill ── */
+    .pill {
+      display: inline-block; font-size: 10px; padding: 2px 7px;
+      border-radius: 20px; font-weight: 600;
+    }
+
+    /* ── Progress ── */
+    .progress-wrap { background: var(--navy-light); border-radius: 100px;
+      height: 7px; overflow: hidden; }
+    .progress-bar { height: 100%; border-radius: 100px;
+      transition: width 0.4s ease; }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 11px 18px; border-radius: 10px; border: none; cursor: pointer;
+      font-family: inherit; font-size: 14px; font-weight: 600;
+      transition: opacity 0.15s; width: 100%;
+    }
+    .btn-primary { background: var(--emerald); color: var(--navy); }
+    .btn-ghost   { background: var(--navy-light); color: var(--white); }
+    .btn-sm { padding: 8px 14px; font-size: 12px; width: auto; border-radius: 8px; }
+    .btn:active { opacity: 0.8; }
+
+    /* ── FAB ── */
+    .fab {
+      position: fixed; right: 20px; bottom: calc(70px + var(--safe-bot) + 16px);
+      width: 52px; height: 52px; border-radius: 50%;
+      background: var(--emerald); color: var(--navy);
+      border: none; font-size: 26px; font-weight: 300;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; box-shadow: 0 4px 20px #00C89650;
+      z-index: 50; transition: transform 0.15s;
+    }
+    .fab:active { transform: scale(0.92); }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.65);
+      display: flex; align-items: flex-end; z-index: 200;
+      backdrop-filter: blur(4px);
+    }
+    .modal {
+      background: var(--navy-mid); border: 1px solid var(--border);
+      border-radius: 20px 20px 0 0; padding: 24px 20px;
+      width: 100%; max-height: 90vh; overflow-y: auto;
+      padding-bottom: calc(24px + var(--safe-bot));
+      animation: slideUp 0.22s ease;
+    }
+    @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    .modal-handle {
+      width: 36px; height: 4px; background: var(--border);
+      border-radius: 2px; margin: 0 auto 20px;
+    }
+    .modal-title { font-size: 17px; font-weight: 700; margin-bottom: 20px; }
+
+    /* ── Form ── */
+    .form-group { margin-bottom: 14px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+    .form-label {
+      display: block; font-size: 11px; font-weight: 600; color: var(--muted);
+      letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 7px;
+    }
+    .form-input {
+      width: 100%; background: var(--navy-light); border: 1px solid var(--border);
+      border-radius: 10px; padding: 12px 14px; color: var(--white);
+      font-family: inherit; font-size: 15px; outline: none;
+      transition: border 0.15s; -webkit-appearance: none;
+    }
+    .form-input:focus { border-color: var(--emerald); }
+    .form-input option { background: var(--navy-mid); }
+    select.form-input {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%237B8EA8' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 14px center; padding-right: 38px;
+    }
+
+    /* ── Type toggle ── */
+    .type-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+    .type-opt {
+      padding: 12px; border-radius: 10px; border: 1.5px solid var(--border);
+      text-align: center; cursor: pointer; font-size: 13px; font-weight: 600;
+      color: var(--muted); transition: all 0.15s;
+    }
+    .type-opt.active-income { border-color: var(--emerald); color: var(--emerald);
+      background: var(--emerald-dim); }
+    .type-opt.active-expense { border-color: var(--coral); color: var(--coral);
+      background: var(--coral-dim); }
+
+    /* ── Credit card ── */
+    .cc-visual {
+      border-radius: 16px; padding: 20px; position: relative;
+      overflow: hidden; min-height: 150px; display: flex; flex-direction: column;
+      justify-content: space-between; margin-bottom: 12px;
+    }
+    .cc-visual::before {
+      content: ''; position: absolute; width: 180px; height: 180px;
+      border-radius: 50%; background: rgba(255,255,255,0.06); top: -50px; right: -50px;
+    }
+    .cc-chip { width: 34px; height: 24px; background: linear-gradient(135deg,#d4a843,#f5c542);
+      border-radius: 5px; margin-bottom: 16px; }
+    .cc-number { font-family: 'JetBrains Mono', monospace; font-size: 14px;
+      letter-spacing: 3px; margin-bottom: 12px; opacity: 0.9; }
+    .cc-footer { display: flex; justify-content: space-between; align-items: flex-end; }
+    .cc-name { font-size: 11px; font-weight: 700; letter-spacing: 1px;
+      text-transform: uppercase; opacity: 0.85; }
+    .cc-used { text-align: right; }
+    .cc-used-label { font-size: 9px; opacity: 0.6; text-transform: uppercase; letter-spacing: 0.5px; }
+    .cc-used-val { font-size: 13px; font-weight: 700;
+      font-family: 'JetBrains Mono', monospace; }
+
+    /* ── Goal card ── */
+    .goal-card { background: var(--navy-mid); border: 1px solid var(--border);
+      border-radius: 14px; padding: 18px; margin-bottom: 12px; }
+    .goal-emoji { font-size: 26px; margin-bottom: 8px; }
+    .goal-name { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+    .goal-amounts { display: flex; justify-content: space-between;
+      font-size: 12px; margin-bottom: 8px; }
+    .goal-actions { display: flex; gap: 8px; margin-top: 12px; }
+
+    /* ── Tab filter ── */
+    .tabs { display: flex; background: var(--navy-light); border-radius: 10px;
+      padding: 4px; margin-bottom: 16px; }
+    .tab {
+      flex: 1; padding: 8px; border-radius: 7px; text-align: center;
+      font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer;
+      transition: all 0.15s;
+    }
+    .tab.active { background: var(--navy-mid); color: var(--white); }
+
+    /* ── Cat filter scroll ── */
+    .cat-scroll { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px;
+      margin-bottom: 14px; scrollbar-width: none; }
+    .cat-scroll::-webkit-scrollbar { display: none; }
+    .cat-chip {
+      flex-shrink: 0; padding: 6px 12px; border-radius: 20px;
+      font-size: 12px; font-weight: 600; cursor: pointer;
+      border: 1.5px solid var(--border); color: var(--muted);
+      transition: all 0.15s; white-space: nowrap;
+    }
+    .cat-chip.active { border-color: var(--emerald); color: var(--emerald);
+      background: var(--emerald-dim); }
+
+    /* ── Color swatches ── */
+    .swatches { display: flex; gap: 8px; flex-wrap: wrap; }
+    .swatch {
+      width: 32px; height: 32px; border-radius: 50%; cursor: pointer;
+      border: 3px solid transparent; transition: border 0.15s;
+    }
+    .swatch.selected { border-color: white; }
+
+    /* ── Empty ── */
+    .empty { text-align: center; padding: 48px 20px; color: var(--muted); }
+    .empty-icon { font-size: 42px; margin-bottom: 12px; }
+    .empty-text { font-size: 14px; }
+
+    /* ── Section heading ── */
+    .sec-title { font-size: 12px; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; margin-top: 4px; }
+
+    /* ── Tag badge ── */
+    .badge { display: inline-flex; align-items: center; gap: 3px; font-size: 10px;
+      padding: 3px 8px; border-radius: 20px; font-weight: 700; }
+
+    /* ── Install prompt ── */
+    .install-bar {
+      background: var(--emerald-dim); border: 1px solid var(--emerald);
+      border-radius: 12px; padding: 12px 14px; margin-bottom: 14px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .install-bar .icon { font-size: 22px; flex-shrink: 0; }
+    .install-bar .text { flex: 1; font-size: 12px; color: var(--emerald); font-weight: 500; }
+    .install-bar button {
+      background: var(--emerald); color: var(--navy); border: none;
+      border-radius: 8px; padding: 7px 14px; font-family: inherit;
+      font-size: 12px; font-weight: 700; cursor: pointer; flex-shrink: 0;
+    }
+    .install-bar .close-btn {
+      background: none; color: var(--muted); padding: 4px;
+      font-size: 16px; flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+// ─── State & Storage ──────────────────────────────────────────────────────────
+const CATS = [
+  { id:"moradia",     label:"Moradia",      emoji:"🏠", color:"#4FB3F6", bg:"#4FB3F620" },
+  { id:"alimentacao", label:"Alimentação",  emoji:"🍽️", color:"#F5C542", bg:"#F5C54220" },
+  { id:"transporte",  label:"Transporte",   emoji:"🚗", color:"#A78BFA", bg:"#A78BFA20" },
+  { id:"saude",       label:"Saúde",        emoji:"💊", color:"#00C896", bg:"#00C89620" },
+  { id:"lazer",       label:"Lazer",        emoji:"🎮", color:"#F472B6", bg:"#F472B620" },
+  { id:"educacao",    label:"Educação",     emoji:"📚", color:"#F5C542", bg:"#F5C54220" },
+  { id:"outros",      label:"Outros",       emoji:"📦", color:"#7B8EA8", bg:"#7B8EA820" },
+];
+
+const CARD_GRADS = [
+  "linear-gradient(135deg,#1a1a2e,#16213e)",
+  "linear-gradient(135deg,#0f3460,#533483)",
+  "linear-gradient(135deg,#1b4332,#2d6a4f)",
+  "linear-gradient(135deg,#3d0c02,#7b2d00)",
+  "linear-gradient(135deg,#1c1c2e,#4a4e69)",
+];
+
+const GOAL_COLORS = ["#00C896","#4FB3F6","#F5C542","#FF6B6B","#A78BFA","#F472B6"];
+
+const SEED = {
+  transactions: [
+    {id:1,type:"income",  desc:"Salário",          amount:5800,  date:"2026-06-05",category:"outros",      card:null},
+    {id:2,type:"expense", desc:"Aluguel",           amount:1500,  date:"2026-06-05",category:"moradia",     card:1},
+    {id:3,type:"expense", desc:"Supermercado Extra",amount:320,   date:"2026-06-10",category:"alimentacao", card:1},
+    {id:4,type:"income",  desc:"Freelance Design",  amount:1200,  date:"2026-06-12",category:"outros",      card:null},
+    {id:5,type:"expense", desc:"Uber",              amount:47,    date:"2026-06-14",category:"transporte",  card:2},
+    {id:6,type:"expense", desc:"Netflix",           amount:39.9,  date:"2026-06-15",category:"lazer",       card:2},
+    {id:7,type:"expense", desc:"Academia",          amount:89.9,  date:"2026-06-15",category:"saude",       card:null},
+    {id:8,type:"expense", desc:"Curso React",       amount:197,   date:"2026-06-18",category:"educacao",    card:2},
+  ],
+  cards: [
+    {id:1,name:"Nubank",number:"4532 •••• •••• 8821",limit:6000,used:2140,  color:4},
+    {id:2,name:"Inter", number:"5369 •••• •••• 4401",limit:4000,used:984.8, color:2},
+  ],
+  goals: [
+    {id:1,name:"Fundo de Emergência",emoji:"🛡️",target:20000,saved:8400, color:"#00C896"},
+    {id:2,name:"Viagem Europa",      emoji:"✈️",target:15000,saved:3200, color:"#4FB3F6"},
+    {id:3,name:"Notebook novo",      emoji:"💻",target:6000, saved:5400, color:"#F5C542"},
+  ]
+};
+
+function load(key, def) {
+  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : def; } catch(e) { return def; }
+}
+function save(key, val) {
+  try { localStorage.setItem(key, JSON.stringify(val)); } catch(e) {}
+}
+
+let S = {
+  page: "dashboard",
+  transactions: load("fp_tx", SEED.transactions),
+  cards: load("fp_cards", SEED.cards),
+  goals: load("fp_goals", SEED.goals),
+  modal: null,        // null | "add-tx" | "add-card" | "add-goal" | "deposit"
+  txFilter: "all",
+  catFilter: "all",
+  depositGoalId: null,
+  installPrompt: null,
+  showInstall: false,
+  // forms
+  txForm: { type:"expense", desc:"", amount:"", date: new Date().toISOString().slice(0,10), category:"alimentacao", card:"" },
+  cardForm: { name:"", number:"", limit:"", used:"", color:0 },
+  goalForm: { name:"", emoji:"🎯", target:"", saved:"", color:"#00C896" },
+  depositVal: "",
+};
+
+function persist() {
+  save("fp_tx",    S.transactions);
+  save("fp_cards", S.cards);
+  save("fp_goals", S.goals);
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function fmtBRL(v) {
+  return "R$ " + Math.abs(v).toLocaleString("pt-BR", {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+function catById(id) { return CATS.find(c => c.id === id) || CATS[6]; }
+function uid() { return Date.now() + Math.random(); }
+
+// ─── Render ───────────────────────────────────────────────────────────────────
+function render() {
+  const root = document.getElementById("app");
+  root.innerHTML = "";
+
+  const app = el("div", {id:"app-inner"});
+  app.appendChild(renderTopbar());
+
+  const content = el("div", {className:"content"});
+
+  if (S.showInstall) content.appendChild(renderInstallBanner());
+
+  if (S.page === "dashboard")    content.appendChild(renderDashboard());
+  if (S.page === "transactions") content.appendChild(renderTransactions());
+  if (S.page === "cards")        content.appendChild(renderCards());
+  if (S.page === "goals")        content.appendChild(renderGoals());
+
+  app.appendChild(content);
+  app.appendChild(renderBottomNav());
+
+  // FAB for add actions on relevant pages
+  if (["transactions","cards","goals"].includes(S.page)) {
+    const fab = el("button", {className:"fab"}, "+");
+    fab.addEventListener("click", () => {
+      if (S.page === "transactions") openModal("add-tx");
+      if (S.page === "cards")        openModal("add-card");
+      if (S.page === "goals")        openModal("add-goal");
+    });
+    app.appendChild(fab);
+  }
+
+  if (S.modal) app.appendChild(renderModal());
+
+  root.appendChild(app);
+}
+
+function el(tag, attrs={}, ...children) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "className") e.className = v;
+    else if (k === "style" && typeof v === "object") Object.assign(e.style, v);
+    else if (k.startsWith("on")) e.addEventListener(k.slice(2).toLowerCase(), v);
+    else e.setAttribute(k, v);
+  }
+  children.forEach(c => {
+    if (c == null || c === false) return;
+    if (typeof c === "string" || typeof c === "number") e.appendChild(document.createTextNode(String(c)));
+    else if (c instanceof Node) e.appendChild(c);
+  });
+  return e;
+}
+
+function h(html) {
+  const d = document.createElement("div");
+  d.innerHTML = html;
+  return d.firstChild;
+}
+
+// ─── Top bar ─────────────────────────────────────────────────────────────────
+function renderTopbar() {
+  const now = new Date();
+  const months = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+  const label = months[now.getMonth()] + " " + now.getFullYear();
+  return el("div", {className:"topbar"},
+    el("div", {className:"topbar-logo"},
+      el("div", {className:"topbar-icon"}, "₿"),
+      el("div", {},
+        el("div", {className:"topbar-title"}, "FinançasPro"),
+        el("div", {className:"topbar-sub"}, "controle pessoal")
+      )
+    ),
+    el("div", {className:"topbar-month"}, label)
+  );
+}
+
+// ─── Bottom nav ───────────────────────────────────────────────────────────────
+function renderBottomNav() {
+  const items = [
+    {id:"dashboard",    icon:"📊", label:"Resumo"},
+    {id:"transactions", icon:"↕️", label:"Lançamentos"},
+    {id:"cards",        icon:"💳", label:"Cartões"},
+    {id:"goals",        icon:"🎯", label:"Objetivos"},
+  ];
+  const nav = el("nav", {className:"bottom-nav"});
+  items.forEach(item => {
+    const btn = el("button", {className:`nav-btn${S.page===item.id?" active":""}`, onClick:()=>{ S.page=item.id; render(); }},
+      el("span", {className:"icon"}, item.icon),
+      item.label
+    );
+    nav.appendChild(btn);
+  });
+  return nav;
+}
+
+// ─── Install banner ───────────────────────────────────────────────────────────
+function renderInstallBanner() {
+  const bar = el("div", {className:"install-bar"},
+    el("span", {className:"icon"}, "📲"),
+    el("span", {className:"text"}, "Instale o app na sua tela inicial para acesso rápido!"),
+    el("button", {onClick: async () => {
+      if (S.installPrompt) { S.installPrompt.prompt(); S.showInstall = false; render(); }
+    }}, "Instalar"),
+    el("button", {className:"close-btn", onClick:()=>{ S.showInstall=false; render(); }}, "✕")
+  );
+  return bar;
+}
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+function renderDashboard() {
+  const income   = S.transactions.filter(t=>t.type==="income") .reduce((s,t)=>s+t.amount,0);
+  const expenses = S.transactions.filter(t=>t.type==="expense").reduce((s,t)=>s+t.amount,0);
+  const balance  = income - expenses;
+  const avail    = S.cards.reduce((s,c)=>s+(c.limit-c.used),0);
+
+  const wrap = el("div");
+
+  // Stats
+  const grid = el("div", {className:"stats-row"});
+  grid.appendChild(statCard("Saldo", balance, balance>=0?"emerald":"coral", balance>=0?"↑ +4.2% este mês":"↓ negativo"));
+  grid.appendChild(statCard("Disponível cartões", avail, "sky"));
+  grid.appendChild(statCard("Receitas", income, "emerald", "↑ +12.5%", true));
+  grid.appendChild(statCard("Despesas", expenses, "coral", "↓ -3.1%", true));
+  wrap.appendChild(grid);
+
+  // Recent transactions
+  const recent = [...S.transactions].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,5);
+  const panel = el("div", {className:"panel"});
+  panel.appendChild(el("div", {className:"panel-hd"},
+    el("span", {className:"panel-title"}, "Últimas transações"),
+    el("span", {style:{fontSize:"12px",color:"var(--muted)",cursor:"pointer"},
+      onClick:()=>{S.page="transactions";render();}}, "ver todas →")
+  ));
+  if (recent.length === 0) {
+    panel.appendChild(el("div", {className:"empty"}, el("div",{className:"empty-text"},"Sem transações")));
+  } else {
+    recent.forEach(tx => panel.appendChild(renderTxRow(tx, false)));
+  }
+  wrap.appendChild(panel);
+
+  // Category breakdown
+  const byCat = {};
+  S.transactions.filter(t=>t.type==="expense").forEach(t=>{ byCat[t.category]=(byCat[t.category]||0)+t.amount; });
+  const top = Object.entries(byCat).sort((a,b)=>b[1]-a[1]).slice(0,4);
+  if (top.length > 0) {
+    const catPanel = el("div", {className:"panel"});
+    catPanel.appendChild(el("div", {className:"panel-hd"}, el("span", {className:"panel-title"}, "Gastos por categoria")));
+    const body = el("div", {style:{padding:"12px 16px"}});
+    const maxVal = Math.max(...top.map(c=>c[1]), 1);
+    top.forEach(([catId, val]) => {
+      const cat = catById(catId);
+      const pct = (val/maxVal)*100;
+      const row = el("div", {style:{marginBottom:"12px"}});
+      row.appendChild(el("div", {style:{display:"flex",justifyContent:"space-between",fontSize:"13px",marginBottom:"6px"}},
+        el("span", {}, cat.emoji + " " + cat.label),
+        el("span", {style:{fontFamily:"'JetBrains Mono',monospace",color:cat.color,fontSize:"12px"}}, fmtBRL(val))
+      ));
+      const pw = el("div", {className:"progress-wrap"});
+      pw.appendChild(el("div", {className:"progress-bar", style:{width:pct+"%",background:cat.color}}));
+      row.appendChild(pw);
+      body.appendChild(row);
+    });
+    catPanel.appendChild(body);
+    wrap.appendChild(catPanel);
+  }
+
+  // Goals preview
+  if (S.goals.length > 0) {
+    const gPanel = el("div", {className:"panel"});
+    gPanel.appendChild(el("div", {className:"panel-hd"},
+      el("span", {className:"panel-title"}, "Objetivos"),
+      el("span", {style:{fontSize:"12px",color:"var(--muted)",cursor:"pointer"},
+        onClick:()=>{S.page="goals";render();}}, "ver todos →")
+    ));
+    const gbody = el("div", {style:{padding:"12px 16px"}});
+    S.goals.slice(0,2).forEach(g => {
+      const pct = Math.min((g.saved/g.target)*100, 100);
+      const row = el("div", {style:{marginBottom:"14px"}});
+      row.appendChild(el("div", {style:{display:"flex",justifyContent:"space-between",fontSize:"13px",marginBottom:"6px"}},
+        el("span",{}, g.emoji + " " + g.name),
+        el("span",{style:{color:g.color,fontWeight:700,fontSize:"12px"}}, pct.toFixed(0)+"%")
+      ));
+      const pw = el("div",{className:"progress-wrap"});
+      pw.appendChild(el("div",{className:"progress-bar",style:{width:pct+"%",background:g.color}}));
+      row.appendChild(pw);
+      gbody.appendChild(row);
+    });
+    gPanel.appendChild(gbody);
+    wrap.appendChild(gPanel);
+  }
+
+  return wrap;
+}
+
+function statCard(label, value, colorClass, delta, wide=false) {
+  const card = el("div", {className:"stat-card"+(wide?" wide":"")});
+  card.appendChild(el("div", {className:"stat-label"}, label));
+  card.appendChild(el("div", {className:"stat-value "+colorClass}, fmtBRL(value)));
+  if (delta) card.appendChild(el("div", {className:"stat-delta "+(delta.startsWith("↑")?"pos":"neg")}, delta));
+  return card;
+}
+
+// ─── Transactions ─────────────────────────────────────────────────────────────
+function renderTransactions() {
+  const wrap = el("div");
+
+  const tabs = el("div", {className:"tabs"});
+  [["all","Todas"],["income","Receitas"],["expense","Despesas"]].forEach(([k,l]) => {
+    const t = el("div", {className:"tab"+(S.txFilter===k?" active":""), onClick:()=>{S.txFilter=k;render();}}, l);
+    tabs.appendChild(t);
+  });
+  wrap.appendChild(tabs);
+
+  // Category filter
+  const catScroll = el("div", {className:"cat-scroll"});
+  const allChip = el("div", {className:"cat-chip"+(S.catFilter==="all"?" active":""), onClick:()=>{S.catFilter="all";render();}}, "Todas");
+  catScroll.appendChild(allChip);
+  CATS.forEach(c => {
+    const chip = el("div",{className:"cat-chip"+(S.catFilter===c.id?" active":""),
+      onClick:()=>{S.catFilter=c.id;render();}}, c.emoji+" "+c.label);
+    if (S.catFilter===c.id) chip.style.borderColor=c.color, chip.style.color=c.color, chip.style.background=c.bg;
+    catScroll.appendChild(chip);
+  });
+  wrap.appendChild(catScroll);
+
+  let filtered = [...S.transactions]
+    .filter(t => S.txFilter==="all" || t.type===S.txFilter)
+    .filter(t => S.catFilter==="all" || t.category===S.catFilter)
+    .sort((a,b) => b.date.localeCompare(a.date));
+
+  const panel = el("div", {className:"panel"});
+  if (filtered.length === 0) {
+    panel.appendChild(el("div",{className:"empty"},
+      el("div",{className:"empty-icon"},"📋"),
+      el("div",{className:"empty-text"},"Nenhuma transação")
+    ));
+  } else {
+    filtered.forEach(tx => panel.appendChild(renderTxRow(tx, true)));
+  }
+  wrap.appendChild(panel);
+  return wrap;
+}
+
+function renderTxRow(tx, showDel=false) {
+  const cat = catById(tx.category);
+  const card = S.cards.find(c=>c.id===tx.card);
+  const row = el("div", {className:"tx-item"});
+  row.appendChild(el("div",{className:"tx-icon",style:{background:cat.bg}}, cat.emoji));
+  const info = el("div",{className:"tx-info"});
+  info.appendChild(el("div",{className:"tx-name"}, tx.desc));
+  const meta = el("div",{className:"tx-meta"});
+  meta.appendChild(document.createTextNode(tx.date + " · "));
+  const pill = el("span",{className:"pill",style:{background:cat.bg,color:cat.color}}, cat.label);
+  meta.appendChild(pill);
+  if (card) meta.appendChild(document.createTextNode(" · 💳 "+card.name));
+  info.appendChild(meta);
+  row.appendChild(info);
+  row.appendChild(el("div",{className:"tx-amount "+(tx.type==="income"?"pos":"neg")},
+    (tx.type==="income"?"+":"-") + fmtBRL(tx.amount)
+  ));
+  if (showDel) {
+    const del = el("button",{className:"tx-del",onClick:(e)=>{
+      e.stopPropagation();
+      S.transactions = S.transactions.filter(t=>t.id!==tx.id);
+      persist(); render();
+    }}, "✕");
+    row.appendChild(del);
+  }
+  return row;
+}
+
+// ─── Cards ────────────────────────────────────────────────────────────────────
+function renderCards() {
+  const wrap = el("div");
+  if (S.cards.length === 0) {
+    const e = el("div",{className:"empty"},
+      el("div",{className:"empty-icon"},"💳"),
+      el("div",{className:"empty-text"},"Nenhum cartão cadastrado.\nToque + para adicionar.")
+    );
+    wrap.appendChild(e);
+    return wrap;
+  }
+  S.cards.forEach(card => {
+    const pct = Math.min((card.used/card.limit)*100, 100);
+    const status = pct>80?"#FF6B6B":pct>50?"#F5C542":"#00C896";
+    const container = el("div",{style:{marginBottom:"16px"}});
+
+    const visual = el("div",{className:"cc-visual",style:{background:CARD_GRADS[card.color]}});
+    visual.appendChild(el("div",{className:"cc-chip"}));
+    visual.appendChild(el("div",{className:"cc-number"}, card.number||"•••• •••• •••• ••••"));
+    const footer = el("div",{className:"cc-footer"});
+    footer.appendChild(el("div",{className:"cc-name"}, card.name));
+    const usedBlock = el("div",{className:"cc-used"});
+    usedBlock.appendChild(el("div",{className:"cc-used-label"},"fatura"));
+    usedBlock.appendChild(el("div",{className:"cc-used-val"}, fmtBRL(card.used)));
+    footer.appendChild(usedBlock);
+    visual.appendChild(footer);
+    container.appendChild(visual);
+
+    const info = el("div",{className:"panel"});
+    const body = el("div",{style:{padding:"14px 16px"}});
+    body.appendChild(el("div",{style:{display:"flex",justifyContent:"space-between",fontSize:"13px",marginBottom:"6px"}},
+      el("span",{style:{color:"var(--muted)"}},"Utilizado"),
+      el("span",{style:{fontFamily:"'JetBrains Mono',monospace",color:status,fontSize:"12px"}},
+        pct.toFixed(1)+"% de "+fmtBRL(card.limit))
+    ));
+    const pw = el("div",{className:"progress-wrap"});
+    pw.appendChild(el("div",{className:"progress-bar",style:{width:pct+"%",background:status}}));
+    body.appendChild(pw);
+    body.appendChild(el("div",{style:{display:"flex",justifyContent:"space-between",marginTop:"10px",fontSize:"12px"}},
+      el("span",{style:{color:"var(--muted)"}}, "Disponível: ", el("span",{style:{color:"#00C896",fontFamily:"'JetBrains Mono',monospace"}}, fmtBRL(card.limit-card.used))),
+      el("button",{className:"btn btn-sm",style:{background:"var(--coral-dim)",color:"var(--coral)"},
+        onClick:()=>{ S.cards=S.cards.filter(c=>c.id!==card.id); persist(); render(); }
+      }, "Remover")
+    ));
+    info.appendChild(body);
+    container.appendChild(info);
+    wrap.appendChild(container);
+  });
+  return wrap;
+}
+
+// ─── Goals ────────────────────────────────────────────────────────────────────
+function renderGoals() {
+  const wrap = el("div");
+  if (S.goals.length === 0) {
+    wrap.appendChild(el("div",{className:"empty"},
+      el("div",{className:"empty-icon"},"🎯"),
+      el("div",{className:"empty-text"},"Nenhum objetivo criado.\nToque + para adicionar.")
+    ));
+    return wrap;
+  }
+  S.goals.forEach(g => {
+    const pct = Math.min((g.saved/g.target)*100, 100);
+    const done = pct >= 100;
+    const card = el("div",{className:"goal-card"});
+
+    const hd = el("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"4px"}});
+    hd.appendChild(el("div",{className:"goal-emoji"}, g.emoji));
+    if (done) hd.appendChild(el("span",{className:"badge",style:{background:"#00C89620",color:"#00C896"}}, "✓ Concluído"));
+    card.appendChild(hd);
+    card.appendChild(el("div",{className:"goal-name"}, g.name));
+
+    const amts = el("div",{className:"goal-amounts"});
+    amts.appendChild(el("span",{style:{color:g.color,fontFamily:"'JetBrains Mono',monospace",fontWeight:700}}, fmtBRL(g.saved)));
+    amts.appendChild(el("span",{style:{color:"var(--muted)"}}, "de "+fmtBRL(g.target)));
+    card.appendChild(amts);
+
+    const pw = el("div",{className:"progress-wrap",style:{height:"8px",marginBottom:"8px"}});
+    pw.appendChild(el("div",{className:"progress-bar",style:{width:pct+"%",background:g.color}}));
+    card.appendChild(pw);
+
+    card.appendChild(el("div",{style:{fontSize:"11px",color:"var(--muted)",marginBottom:"4px"}},
+      "Progresso: ",el("span",{style:{color:g.color,fontWeight:700}}, pct.toFixed(1)+"%"),
+      "  |  Faltam: ",el("span",{style:{color:"var(--white)",fontFamily:"'JetBrains Mono',monospace"}}, fmtBRL(g.target-g.saved))
+    ));
+
+    const actions = el("div",{className:"goal-actions"});
+    if (!done) {
+      const dep = el("button",{className:"btn btn-primary btn-sm",style:{flex:1},
+        onClick:()=>{ S.depositGoalId=g.id; openModal("deposit"); }}, "+ Depositar");
+      actions.appendChild(dep);
+    }
+    actions.appendChild(el("button",{className:"btn btn-sm",style:{background:"var(--coral-dim)",color:"var(--coral)"},
+      onClick:()=>{ S.goals=S.goals.filter(x=>x.id!==g.id); persist(); render(); }}, "✕ Remover"));
+    card.appendChild(actions);
+    wrap.appendChild(card);
+  });
+  return wrap;
+}
+
+// ─── Modal ────────────────────────────────────────────────────────────────────
+function openModal(name) { S.modal = name; render(); }
+function closeModal() { S.modal = null; render(); }
+
+function renderModal() {
+  const overlay = el("div",{className:"modal-overlay",onClick:(e)=>{ if(e.target===overlay) closeModal(); }});
+  const modal = el("div",{className:"modal"});
+  modal.appendChild(el("div",{className:"modal-handle"}));
+
+  if (S.modal === "add-tx")   modal.appendChild(renderAddTxForm());
+  if (S.modal === "add-card") modal.appendChild(renderAddCardForm());
+  if (S.modal === "add-goal") modal.appendChild(renderAddGoalForm());
+  if (S.modal === "deposit")  modal.appendChild(renderDepositForm());
+
+  overlay.appendChild(modal);
+  return overlay;
+}
+
+function renderAddTxForm() {
+  const f = S.txForm;
+  const wrap = el("div");
+  wrap.appendChild(el("div",{className:"modal-title"}, "Nova transação"));
+
+  // Type toggle
+  const toggle = el("div",{className:"type-toggle"});
+  ["expense","income"].forEach(type => {
+    const opt = el("div",{
+      className:"type-opt"+(f.type===type?" active-"+type:""),
+      onClick:()=>{ S.txForm.type=type; render(); }
+    }, type==="expense"?"💸 Despesa":"💰 Receita");
+    toggle.appendChild(opt);
+  });
+  wrap.appendChild(toggle);
+
+  wrap.appendChild(formGroup("Descrição",
+    inputEl("text", f.desc, "Ex: Supermercado", v=>{ S.txForm.desc=v; })
+  ));
+  const row = el("div",{className:"form-row"});
+  row.appendChild(formGroup("Valor (R$)", inputEl("number", f.amount, "0,00", v=>{ S.txForm.amount=v; })));
+  row.appendChild(formGroup("Data", inputEl("date", f.date, "", v=>{ S.txForm.date=v; })));
+  wrap.appendChild(row);
+  wrap.appendChild(formGroup("Categoria", selectEl(
+    CATS.map(c=>({value:c.id,label:c.emoji+" "+c.label})), f.category, v=>{ S.txForm.category=v; }
+  )));
+  if (f.type==="expense") {
+    wrap.appendChild(formGroup("Cartão (opcional)", selectEl(
+      [{value:"",label:"Dinheiro / Débito"}, ...S.cards.map(c=>({value:String(c.id),label:c.name}))],
+      String(f.card||""), v=>{ S.txForm.card = v ? parseInt(v) : ""; }
+    )));
+  }
+
+  const btns = el("div",{style:{display:"flex",gap:"10px",marginTop:"6px"}});
+  btns.appendChild(el("button",{className:"btn btn-ghost",style:{flex:1},onClick:closeModal}, "Cancelar"));
+  btns.appendChild(el("button",{className:"btn btn-primary",style:{flex:1},onClick:()=>{
+    if (!f.desc || !f.amount) return;
+    S.transactions.push({...f, id:uid(), amount:parseFloat(f.amount)});
+    S.txForm = {type:"expense",desc:"",amount:"",date:new Date().toISOString().slice(0,10),category:"alimentacao",card:""};
+    persist(); closeModal();
+  }}, "Salvar"));
+  wrap.appendChild(btns);
+  return wrap;
+}
+
+function renderAddCardForm() {
+  const f = S.cardForm;
+  const wrap = el("div");
+  wrap.appendChild(el("div",{className:"modal-title"}, "Novo cartão"));
+  wrap.appendChild(formGroup("Nome do cartão", inputEl("text", f.name, "Ex: Nubank", v=>{ S.cardForm.name=v; })));
+  wrap.appendChild(formGroup("Número (opcional)", inputEl("text", f.number, "•••• •••• •••• ••••", v=>{ S.cardForm.number=v; })));
+  const row = el("div",{className:"form-row"});
+  row.appendChild(formGroup("Limite total", inputEl("number", f.limit, "5000", v=>{ S.cardForm.limit=v; })));
+  row.appendChild(formGroup("Fatura atual", inputEl("number", f.used, "0", v=>{ S.cardForm.used=v; })));
+  wrap.appendChild(row);
+
+  const swatchWrap = el("div",{className:"form-group"});
+  swatchWrap.appendChild(el("label",{className:"form-label"}, "Cor"));
+  const swatches = el("div",{className:"swatches"});
+  CARD_GRADS.forEach((g,i) => {
+    const sw = el("div",{className:"swatch"+(f.color===i?" selected":""),
+      style:{background:g}, onClick:()=>{ S.cardForm.color=i; render(); }});
+    swatches.appendChild(sw);
+  });
+  swatchWrap.appendChild(swatches);
+  wrap.appendChild(swatchWrap);
+
+  const btns = el("div",{style:{display:"flex",gap:"10px",marginTop:"6px"}});
+  btns.appendChild(el("button",{className:"btn btn-ghost",style:{flex:1},onClick:closeModal}, "Cancelar"));
+  btns.appendChild(el("button",{className:"btn btn-primary",style:{flex:1},onClick:()=>{
+    if (!f.name || !f.limit) return;
+    S.cards.push({...f,id:uid(),limit:parseFloat(f.limit),used:parseFloat(f.used)||0});
+    S.cardForm = {name:"",number:"",limit:"",used:"",color:0};
+    persist(); closeModal();
+  }}, "Salvar"));
+  wrap.appendChild(btns);
+  return wrap;
+}
+
+function renderAddGoalForm() {
+  const f = S.goalForm;
+  const wrap = el("div");
+  wrap.appendChild(el("div",{className:"modal-title"}, "Novo objetivo"));
+  const row1 = el("div",{className:"form-row"});
+  row1.appendChild(formGroup("Nome", inputEl("text", f.name, "Ex: Viagem", v=>{ S.goalForm.name=v; })));
+  row1.appendChild(formGroup("Emoji", inputEl("text", f.emoji, "🎯", v=>{ S.goalForm.emoji=v; })));
+  wrap.appendChild(row1);
+  const row2 = el("div",{className:"form-row"});
+  row2.appendChild(formGroup("Meta (R$)", inputEl("number", f.target, "10000", v=>{ S.goalForm.target=v; })));
+  row2.appendChild(formGroup("Já poupei", inputEl("number", f.saved, "0", v=>{ S.goalForm.saved=v; })));
+  wrap.appendChild(row2);
+
+  const colorWrap = el("div",{className:"form-group"});
+  colorWrap.appendChild(el("label",{className:"form-label"}, "Cor"));
+  const swatches = el("div",{className:"swatches"});
+  GOAL_COLORS.forEach(col => {
+    const sw = el("div",{className:"swatch"+(f.color===col?" selected":""),
+      style:{background:col}, onClick:()=>{ S.goalForm.color=col; render(); }});
+    swatches.appendChild(sw);
+  });
+  colorWrap.appendChild(swatches);
+  wrap.appendChild(colorWrap);
+
+  const btns = el("div",{style:{display:"flex",gap:"10px",marginTop:"6px"}});
+  btns.appendChild(el("button",{className:"btn btn-ghost",style:{flex:1},onClick:closeModal}, "Cancelar"));
+  btns.appendChild(el("button",{className:"btn btn-primary",style:{flex:1},onClick:()=>{
+    if (!f.name || !f.target) return;
+    S.goals.push({...f,id:uid(),target:parseFloat(f.target),saved:parseFloat(f.saved)||0});
+    S.goalForm = {name:"",emoji:"🎯",target:"",saved:"",color:"#00C896"};
+    persist(); closeModal();
+  }}, "Criar meta"));
+  wrap.appendChild(btns);
+  return wrap;
+}
+
+function renderDepositForm() {
+  const goal = S.goals.find(g=>g.id===S.depositGoalId);
+  if (!goal) return el("div");
+  const wrap = el("div");
+  wrap.appendChild(el("div",{className:"modal-title"}, goal.emoji+" Depositar em "+goal.name));
+  wrap.appendChild(formGroup("Valor (R$)", inputEl("number", S.depositVal, "0,00", v=>{ S.depositVal=v; })));
+  const btns = el("div",{style:{display:"flex",gap:"10px",marginTop:"6px"}});
+  btns.appendChild(el("button",{className:"btn btn-ghost",style:{flex:1},onClick:closeModal}, "Cancelar"));
+  btns.appendChild(el("button",{className:"btn btn-primary",style:{flex:1},onClick:()=>{
+    const val = parseFloat(S.depositVal);
+    if (!val||val<=0) return;
+    S.goals = S.goals.map(g => g.id===S.depositGoalId ? {...g, saved:Math.min(g.saved+val,g.target)} : g);
+    S.depositVal=""; persist(); closeModal();
+  }}, "Confirmar"));
+  wrap.appendChild(btns);
+  return wrap;
+}
+
+// ─── Form helpers ─────────────────────────────────────────────────────────────
+function formGroup(label, input) {
+  const g = el("div",{className:"form-group"});
+  g.appendChild(el("label",{className:"form-label"}, label));
+  g.appendChild(input);
+  return g;
+}
+function inputEl(type, value, placeholder, onChange) {
+  const input = el("input",{type, className:"form-input", value:value||"", placeholder});
+  input.addEventListener("input", e => { onChange(e.target.value); });
+  return input;
+}
+function selectEl(options, value, onChange) {
+  const sel = el("select",{className:"form-input"});
+  options.forEach(o => {
+    const opt = el("option",{value:o.value}, o.label);
+    if (o.value === value) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  sel.addEventListener("change", e => onChange(e.target.value));
+  return sel;
+}
+
+// ─── PWA install prompt ────────────────────────────────────────────────────────
+window.addEventListener("beforeinstallprompt", e => {
+  e.preventDefault();
+  S.installPrompt = e;
+  S.showInstall = true;
+  render();
+});
+
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+render();
+</script>
+</body>
+</html>
